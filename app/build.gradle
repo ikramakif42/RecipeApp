@@ -2,15 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-def getApiKeyFromEnv() {
-    def envFile = rootProject.file('.env')
-    def props = new Properties()
-    if (envFile.exists()) {
-        props.load(new FileInputStream(envFile))
-    }
-    return props.getProperty("API_KEY", "")
-}
-
 android {
     namespace 'com.example.recipeapp'
     compileSdk 35
@@ -21,16 +12,13 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0"
-        android.buildFeatures.buildConfig true
         buildConfigField "String", "API_KEY", "\"${getApiKeyFromEnv()}\""
-
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
     compileOptions {
@@ -39,13 +27,14 @@ android {
     }
 }
 
-dependencies {
+def getApiKeyFromEnv() {
+    def props = new Properties()
+    file(".env").withInputStream { props.load(it) }
+    return props.getProperty("API_KEY", "")
+}
 
+dependencies {
     implementation libs.appcompat
     implementation libs.material
-    implementation libs.activity
     implementation libs.constraintlayout
-    testImplementation libs.junit
-    androidTestImplementation libs.ext.junit
-    androidTestImplementation libs.espresso.core
 }
