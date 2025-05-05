@@ -12,7 +12,12 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0"
-        buildConfigField "String", "API_KEY", "\"${getApiKeyFromEnv()}\""
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        android.buildFeatures.buildConfig true
+        buildConfigField "String", "GEMINI_API_KEY", "\"${getApiKeyFromEnv()}\""
+        buildConfigField "String", "SPOON_API_KEY", "\"${getSpoonKeyFromEnv()}\""
     }
 
     buildTypes {
@@ -29,12 +34,22 @@ android {
 
 def getApiKeyFromEnv() {
     def props = new Properties()
-    file(".env").withInputStream { props.load(it) }
-    return props.getProperty("API_KEY", "")
+    rootProject.file(".env").withInputStream { props.load(it) }
+    return props.getProperty("GEMINI_API_KEY", "")
+}
+
+def getSpoonKeyFromEnv() {
+    def props = new Properties()
+    rootProject.file(".env").withInputStream { props.load(it) }
+    return props.getProperty("SPOON_API_KEY", "")
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     implementation libs.appcompat
     implementation libs.material
     implementation libs.constraintlayout
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
 }
