@@ -55,11 +55,11 @@ public class BotChat extends AsyncTask<String, Void, String> {
             MainActivity.conversationHistory.add(userMessageObj);
 
             String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n + " +
-                    "1. intent: one of [get_recipes, load_preset, save_favorite, calorie_filter]\n" +
+                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter]\n" +
                     "2. value: cleaned data to use based on intent.\n\n" +
                     "Rules:\n" +
                     "- If intent is get_recipes: 'value' must be a comma-separated list of ingredients, corrected for typos.\n" +
-                    "- If intent is load_preset: 'value' is the preset name (e.g., breakfast, lunch).\n" +
+                    "- If intent is save_preset: 'value' is the preset of comma-separated list of ingredients and the name (e.g., \"breakfast,lunch\").\n" +
                     "- If intent is save_favorite: 'value' is the recipe name or ID if mentioned.\n" +
                     "- If intent is calorie_filter: 'value' is the calorie limit as a number (e.g., 500).\n\n" +
                     "Respond ONLY with a valid JSON object, NOTHING ELSE like:\n" +
@@ -171,13 +171,15 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     }
 
                     return readResponse(calorieConn.getInputStream());
-                case "load_preset":
-                    Log.d("load_preset", userMessage+"\n"+value);
-//                    List<String> ingredients = SQLiteHelper.loadPreset(userMessage);  // you define
+                case "save_preset":
+                    Log.d("save_preset", userMessage+"\n"+value);
+                    //TODO: SQLite Logic to save preset from chatbot
+//                    List<String> ingredients = SQLiteHelper.savePreset(userMessage);
 //                    result = SpoonacularHelper.getRecipesByIngredients(String.join(",", ingredients));
                     break;
                 case "save_favorite":
                     Log.d("save_favorite", userMessage+"\n"+value);
+                    //TODO: SQLite Logic to save favorite recipe from chatbot
 //                    SQLiteHelper.saveFavoriteFromText(userMessage);  // you define
 //                    result = "Recipe saved.";
                     break;
