@@ -51,7 +51,7 @@ public class SpoonHelper {
                 String recipeInfo = fetchFullRecipeById(id);
                 output.append(recipeInfo).append("\n\n");
             }
-            Log.d("Spoon", output.toString());
+            Log.d("Spoon API", output.toString());
             return output.toString().trim();
 
         } catch (Exception e) {
@@ -64,7 +64,7 @@ public class SpoonHelper {
 
     private static String fetchFullRecipeById(int id) throws Exception {
         String infoUrl = "https://api.spoonacular.com/recipes/" + id + "/information" +
-                "?includeNutrition=false&apiKey=" + SPOONACULAR_API_KEY;
+                "?includeNutrition=true&apiKey=" + SPOONACULAR_API_KEY; // Added includeNutrition=true
 
         HttpURLConnection conn = (HttpURLConnection) new URL(infoUrl).openConnection();
         conn.setRequestMethod("GET");
@@ -77,22 +77,48 @@ public class SpoonHelper {
         JSONObject data = new JSONObject(jsonResponse);
 
         String title = data.optString("title", "Untitled");
-        String summary = data.optString("summary", "").replaceAll("<.*?>", "");
+        // Remove the summary section completely
         String instructions = data.optString("instructions", "No instructions provided.");
+
+        // Get calories if nutrition info is available
+        String calorieInfo = "";
+        if (data.has("nutrition") && !data.isNull("nutrition")) {
+            JSONObject nutrition = data.getJSONObject("nutrition");
+            if (nutrition.has("nutrients")) {
+                JSONArray nutrients = nutrition.getJSONArray("nutrients");
+                for (int i = 0; i < nutrients.length(); i++) {
+                    JSONObject nutrient = nutrients.getJSONObject(i);
+                    if ("Calories".equals(nutrient.optString("name"))) {
+                        double calories = nutrient.optDouble("amount");
+                        String unit = nutrient.optString("unit");
+                        calorieInfo = "Calories: " + calories + " " + unit + "\n";
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Get servings information
+        String servingInfo = "";
+        int servings = data.optInt("servings", 0);
+        if (servings > 0) {
+            servingInfo = "Servings: " + servings + "\n";
+        }
 
         JSONArray ingredients = data.optJSONArray("extendedIngredients");
         StringBuilder ingredientList = new StringBuilder();
         if (ingredients != null) {
             for (int j = 0; j < ingredients.length(); j++) {
                 JSONObject ing = ingredients.getJSONObject(j);
-                ingredientList.append(j+1).append(" ")
+                ingredientList.append(j+1).append(". ")
                         .append(ing.optString("original", ""))
                         .append("\n");
             }
         }
 
         return title + "\n\n" +
-                "Summary: " + summary + "\n\n" +
+                calorieInfo +
+                servingInfo +
                 "Ingredients:\n" + ingredientList.toString() + "\n" +
                 "Instructions:\n" + instructions;
     }

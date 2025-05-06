@@ -1,18 +1,25 @@
 package com.example.recipeapp;
 
+import android.app.Dialog;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.ImageButton;
+import android.widget.PopupMenu;
+import android.widget.TextView;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements BotChat.ApiResponseListener {
     private ChatAdapter chatAdapter;
     private ArrayList<ChatMessage> chatMessages;
     private EditText editTextMessage;
+    public static ArrayList<JSONObject> conversationHistory = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,10 +34,37 @@ public class MainActivity extends AppCompatActivity implements BotChat.ApiRespon
         recyclerView.setAdapter(chatAdapter);
 
         editTextMessage = findViewById(R.id.editTextMessage);
-        findViewById(R.id.btnSend).setOnClickListener(v -> sendMessage());
+        findViewById(R.id.btnSend).setOnClickListener(this::sendMessage);
+        findViewById(R.id.btnOptions).setOnClickListener(this::viewOptions);
     }
 
-    private void sendMessage() {
+    private void viewOptions(View v) {
+        PopupMenu popup = new PopupMenu(this, v);
+        popup.getMenuInflater().inflate(R.menu.options_menu, popup.getMenu());
+
+        popup.setOnMenuItemClickListener(item -> {
+            String selected = (String) item.getTitle();
+
+            if (selected.equals("Load Preset") ||
+                    selected.equals("Remove Presets") ||
+                    selected.equals("View Favorites") ||
+                    selected.equals("Delete Favorites")) {
+
+                showDummyDialog(selected);
+                return true;
+            }
+
+            return false;
+        });
+
+        popup.show();
+    }
+
+    private void sendMessage(View v) {
+        if (findViewById(R.id.introMessage).getVisibility() == View.VISIBLE) {
+            findViewById(R.id.introMessage).setVisibility(View.GONE);
+        }
+
         String message = editTextMessage.getText().toString().trim();
         if (message.isEmpty()) return;
 
@@ -39,6 +73,20 @@ public class MainActivity extends AppCompatActivity implements BotChat.ApiRespon
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
         new BotChat(this).execute(message);
     }
+
+    private void showDummyDialog(String title) {
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_dummy_popup);
+        dialog.setCancelable(true);
+
+        TextView titleView = dialog.findViewById(R.id.dialogTitle);
+        titleView.setText(title);
+
+        dialog.findViewById(R.id.btnCloseDialog).setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
 
     @Override
     public void onApiResponse(String response) {
