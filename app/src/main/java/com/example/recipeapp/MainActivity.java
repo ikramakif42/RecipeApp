@@ -11,7 +11,7 @@ import android.widget.Toast;
 
 import com.example.recipeapp.Meal;
 import com.example.recipeapp.MealDatabase;
-import java.util.List; // Add this import
+import java.util.List;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -21,13 +21,14 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements BotChat.ApiResponseListener {
+public class MainActivity extends AppCompatActivity implements ApiResponseListener {
     private ChatAdapter chatAdapter;
     private ArrayList<ChatMessage> chatMessages;
     private EditText editTextMessage;
     public static ArrayList<JSONObject> conversationHistory = new ArrayList<>();
     private MealDatabase mealDb;
     private List<Meal> meals = new ArrayList<>();
+    public static ArrayList<Recipe> recipeList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,6 +82,16 @@ public class MainActivity extends AppCompatActivity implements BotChat.ApiRespon
         dialog.show();
     }
     private void viewOptions(View v) {
+        //TODO: Add Favorites, View Favorites, Delete Favorites, Add Frequents, View Frequents, Delete Frequents
+        // Add Favorites: Load recipes from recipeList, on click selected recipe saved to DB
+        // In loading recipes from recipeList, check for duplicates
+        // View Favorites: Load recipes from DB, on click selected recipe sent to chat UI
+        // Delete Favorites: Load recipes from DB, on click selected recipe deleted from DB
+        // Add Frequents: Get input from user: (1) Title, (2) all ingredients, then format as below, and save to DB
+        // e.g. "I have milk, sausage and eggs" -> "milk,sausage,eggs"
+        // View Frequents: Load all saved frequents from DB, on click selected frequents loaded into user chatbox
+        // e.g. "I have [x,y,z], what can I make?"
+        // Delete Frequents: Load all saved frequents from DB, on click selected frequents deleted from DB
         PopupMenu popup = new PopupMenu(this, v);
         popup.getMenuInflater().inflate(R.menu.options_menu, popup.getMenu());
 

@@ -43,13 +43,16 @@ public class BotChat extends AsyncTask<String, Void, String> {
     @Override
     protected String doInBackground(String... params) {
         Log.d("HISTORY", MainActivity.conversationHistory.toString());
+        Log.d("RECIPE_LIST", MainActivity.recipeList.toString());
         HttpURLConnection connection = null;
         try {
+            // Setup connection
             connection = (HttpURLConnection) new URL(API_URL).openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setDoOutput(true);
 
+            // Save history and prompt Gemini
             String userMessage = params[0];
             JSONObject userMessageObj = new JSONObject();
             JSONArray parts = new JSONArray();
@@ -58,8 +61,8 @@ public class BotChat extends AsyncTask<String, Void, String> {
             userMessageObj.put("parts", parts);
             MainActivity.conversationHistory.add(userMessageObj);
 
-            String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n" +
-                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter, save_meal, use_meal]\n" +
+            String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n + " +
+                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter]\n" +
                     "2. value: cleaned data to use based on intent.\n\n" +
                     "Rules for meals:\n" +
                     "- If intent is save_meal: 'value' must be a JSON string with 'meal' (breakfast/lunch/dinner/snacks) and 'ingredients' (comma-separated list)\n" +
@@ -67,10 +70,17 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     "Example responses:\n" +
                     "User: 'add eggs and bacon to breakfast'\n" +
                     "Response: {\"intent\":\"save_meal\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredients\\\":\\\"eggs,bacon\\\"}\"}\n\n" +
+                    "Rules:\n" +
+                    "- If intent is get_recipes: 'value' must be a comma-separated list of ingredients, corrected for typos.\n" +
+                    "- If intent is calorie_filter: 'value' is the calorie limit as a number (e.g., 500).\n\n" +
+                    "Respond ONLY with a valid JSON object, NOTHING ELSE like:\n" +
+                    "{ \"intent\": \"get_recipes\", \"value\": \"apples,flour,sugar\" }\n\n" +
                     "User input: \"" + userMessage + "\"";
+
             JSONObject requestBody = buildRequestBody(classifierPrompt);
             Log.d("API Request", requestBody.toString(4));
 
+            // Get response
             try (OutputStream os = connection.getOutputStream()) {
                 os.write(requestBody.toString().getBytes(StandardCharsets.UTF_8));
             }
@@ -79,6 +89,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                 return "{\"error\":\"API request failed\"}";
             }
 
+            // Extract response JSON
             String rawResponse = readResponse(connection.getInputStream());
             Log.d("API Response", rawResponse);
             JSONObject json = new JSONObject(rawResponse);
@@ -95,6 +106,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     .trim();
             Log.d("Clean Response", textResponse);
 
+            // parse into JSON as needed
             String intent = "";
             String value = "";
             try {
@@ -112,6 +124,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                 value = "";
             }
 
+            // Use cases
             String result = "";
             switch (intent) {
                 case "get_recipes":
@@ -125,6 +138,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                             .trim();
                     Log.d("get_recipes", result);
 
+                    // Update history
                     JSONObject botResponse = new JSONObject();
                     parts = new JSONArray();
                     parts.put(new JSONObject().put("text", result));
@@ -132,6 +146,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     botResponse.put("parts", parts);
                     MainActivity.conversationHistory.add(botResponse);
 
+                    // Format into Gemini JSON structure
                     JSONObject recipeResponse = new JSONObject();
                     JSONArray candidates = new JSONArray();
                     JSONObject cand = new JSONObject();
@@ -167,20 +182,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     }
 
                     return readResponse(calorieConn.getInputStream());
-                case "save_preset":
-                    Log.d("save_preset", userMessage+"\n"+value);
-                    //TODO: SQLite Logic to save preset from chatbot
-//                    List<String> ingredients = SQLiteHelper.savePreset(userMessage);
-//                    result = SpoonacularHelper.getRecipesByIngredients(String.join(",", ingredients));
-                    break;
-                case "save_favorite":
-                    Log.d("save_favorite", userMessage+"\n"+value);
-                    //TODO: SQLite Logic to save favorite recipe from chatbot
-                    break;
-                default:
-                    Log.d("default", userMessage+"\n"+value);
-                    result = "Sorry, I couldn't understand your request. Please rephrase.";
-                    break;
+
                 case "save_meal":
                     try {
                         JSONObject mealData = new JSONObject(value);
@@ -226,8 +228,13 @@ public class BotChat extends AsyncTask<String, Void, String> {
                         result = "Error using meal ingredients";
                     }
                     break;
+                default:
+                    Log.d("default", userMessage+"\n"+value);
+                    result = "Sorry, I couldn't understand your request. Please rephrase.";
+                    break;
             }
 
+            // Second response from Gemini to chat if needed
             HttpURLConnection formatConn = (HttpURLConnection) new URL(API_URL).openConnection();
             formatConn.setRequestMethod("POST");
             formatConn.setRequestProperty("Content-Type", "application/json");
@@ -301,7 +308,4 @@ public class BotChat extends AsyncTask<String, Void, String> {
         }
     }
 
-    public interface ApiResponseListener {
-        void onApiResponse(String response);
-    }
 }

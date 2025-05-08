@@ -34,13 +34,13 @@ android {
 
 def getApiKeyFromEnv() {
     def props = new Properties()
-    rootProject.file("d41d8cd9.env").withInputStream { props.load(it) }
+    rootProject.file(".env").withInputStream { props.load(it) }
     return props.getProperty("GEMINI_API_KEY", "")
 }
 
 def getSpoonKeyFromEnv() {
     def props = new Properties()
-    rootProject.file("d41d8cd9.env").withInputStream { props.load(it) }
+    rootProject.file(".env").withInputStream { props.load(it) }
     return props.getProperty("SPOON_API_KEY", "")
 }
 

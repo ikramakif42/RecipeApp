@@ -116,6 +116,10 @@ public class SpoonHelper {
             }
         }
 
+        MainActivity.recipeList.add(
+                new Recipe(String.valueOf(id), title, calorieInfo, servingInfo, ingredientList.toString(), instructions)
+        );
+
         return title + "\n\n" +
                 calorieInfo +
                 servingInfo +
