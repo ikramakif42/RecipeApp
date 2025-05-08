@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">RecipeApp</string>
+    <string name="meals_title">Your Meals</string>
+    <string name="ingredients_added">Ingredients added to %1$s</string>
+    <string name="no_ingredients_found">No ingredients found for %1$s</string>
+    <string name="meal_error">Error processing meal request</string>
 </resources>

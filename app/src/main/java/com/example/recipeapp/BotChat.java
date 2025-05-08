@@ -1,5 +1,6 @@
 package com.example.recipeapp;
 
+import android.app.Activity;
 import android.os.AsyncTask;
 import android.util.Log;
 
@@ -15,6 +16,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public class BotChat extends AsyncTask<String, Void, String> {
     private ApiResponseListener listener;
@@ -22,6 +26,8 @@ public class BotChat extends AsyncTask<String, Void, String> {
     public BotChat(ApiResponseListener listener) {
         this.listener = listener;
     }
+    private MealDatabase mealDb;
+    private List<Meal> meals = new ArrayList<>();
 
     private String readResponse(InputStream inputStream) throws Exception {
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -39,13 +45,11 @@ public class BotChat extends AsyncTask<String, Void, String> {
         Log.d("HISTORY", MainActivity.conversationHistory.toString());
         HttpURLConnection connection = null;
         try {
-            // Setup connection
             connection = (HttpURLConnection) new URL(API_URL).openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setDoOutput(true);
 
-            // Save history and prompt Gemini
             String userMessage = params[0];
             JSONObject userMessageObj = new JSONObject();
             JSONArray parts = new JSONArray();
@@ -54,22 +58,19 @@ public class BotChat extends AsyncTask<String, Void, String> {
             userMessageObj.put("parts", parts);
             MainActivity.conversationHistory.add(userMessageObj);
 
-            String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n + " +
-                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter]\n" +
+            String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n" +
+                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter, save_meal, use_meal]\n" +
                     "2. value: cleaned data to use based on intent.\n\n" +
-                    "Rules:\n" +
-                    "- If intent is get_recipes: 'value' must be a comma-separated list of ingredients, corrected for typos.\n" +
-                    "- If intent is save_preset: 'value' is the preset of comma-separated list of ingredients and the name (e.g., \"breakfast,lunch\").\n" +
-                    "- If intent is save_favorite: 'value' is the recipe name or ID if mentioned.\n" +
-                    "- If intent is calorie_filter: 'value' is the calorie limit as a number (e.g., 500).\n\n" +
-                    "Respond ONLY with a valid JSON object, NOTHING ELSE like:\n" +
-                    "{ \"intent\": \"get_recipes\", \"value\": \"apples,flour,sugar\" }\n\n" +
+                    "Rules for meals:\n" +
+                    "- If intent is save_meal: 'value' must be a JSON string with 'meal' (breakfast/lunch/dinner/snacks) and 'ingredients' (comma-separated list)\n" +
+                    "- If intent is use_meal: 'value' must be the meal name (breakfast/lunch/dinner/snacks)\n\n" +
+                    "Example responses:\n" +
+                    "User: 'add eggs and bacon to breakfast'\n" +
+                    "Response: {\"intent\":\"save_meal\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredients\\\":\\\"eggs,bacon\\\"}\"}\n\n" +
                     "User input: \"" + userMessage + "\"";
-
             JSONObject requestBody = buildRequestBody(classifierPrompt);
             Log.d("API Request", requestBody.toString(4));
 
-            // Get response
             try (OutputStream os = connection.getOutputStream()) {
                 os.write(requestBody.toString().getBytes(StandardCharsets.UTF_8));
             }
@@ -78,7 +79,6 @@ public class BotChat extends AsyncTask<String, Void, String> {
                 return "{\"error\":\"API request failed\"}";
             }
 
-            // Extract response JSON
             String rawResponse = readResponse(connection.getInputStream());
             Log.d("API Response", rawResponse);
             JSONObject json = new JSONObject(rawResponse);
@@ -95,7 +95,6 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     .trim();
             Log.d("Clean Response", textResponse);
 
-            // parse into JSON as needed
             String intent = "";
             String value = "";
             try {
@@ -113,7 +112,6 @@ public class BotChat extends AsyncTask<String, Void, String> {
                 value = "";
             }
 
-            // Use cases
             String result = "";
             switch (intent) {
                 case "get_recipes":
@@ -127,7 +125,6 @@ public class BotChat extends AsyncTask<String, Void, String> {
                             .trim();
                     Log.d("get_recipes", result);
 
-                    // Update history
                     JSONObject botResponse = new JSONObject();
                     parts = new JSONArray();
                     parts.put(new JSONObject().put("text", result));
@@ -135,7 +132,6 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     botResponse.put("parts", parts);
                     MainActivity.conversationHistory.add(botResponse);
 
-                    // Format into Gemini JSON structure
                     JSONObject recipeResponse = new JSONObject();
                     JSONArray candidates = new JSONArray();
                     JSONObject cand = new JSONObject();
@@ -180,17 +176,58 @@ public class BotChat extends AsyncTask<String, Void, String> {
                 case "save_favorite":
                     Log.d("save_favorite", userMessage+"\n"+value);
                     //TODO: SQLite Logic to save favorite recipe from chatbot
-//                    SQLiteHelper.saveFavoriteFromText(userMessage);  // you define
-//                    result = "Recipe saved.";
                     break;
                 default:
                     Log.d("default", userMessage+"\n"+value);
                     result = "Sorry, I couldn't understand your request. Please rephrase.";
-//                    result = "Unrecognized task.";
+                    break;
+                case "save_meal":
+                    try {
+                        JSONObject mealData = new JSONObject(value);
+                        String mealName = mealData.getString("meal").toLowerCase();
+                        String ingredientsStr = mealData.getString("ingredients");
+
+                        List<String> ingredients = new ArrayList<>();
+                        for (String item : ingredientsStr.split(",")) {
+                            String clean = item.trim();
+                            if (!clean.isEmpty()) ingredients.add(clean);
+                        }
+
+                        if (!ingredients.isEmpty()) {
+                            Activity activity = (Activity) listener;
+                            if (activity instanceof MainActivity) {
+                                ((MainActivity)activity).addIngredientsToMeal(mealName, ingredients);
+                            }
+                            result = "Added to " + mealName;
+                        } else {
+                            result = "No valid ingredients provided";
+                        }
+                    } catch (Exception e) {
+                        result = "Error processing ingredients";
+                        Log.e("MEAL_PARSE", "Failed to parse: " + value, e);
+                    }
+                    break;
+                case "use_meal":
+                    Log.d("use_meal", userMessage+"\n"+value);
+                    try {
+                        Meal meal = mealDb.mealDao().getMealByName(value);
+                        if (meal != null && !meal.getIngredients().isEmpty()) {
+                            String ingredients = String.join(", ", meal.getIngredients());
+                            result = SpoonHelper.getRecipesByIngredients(ingredients)
+                                    .replaceAll("(?i)<ol>|</ol>", "")
+                                    .replaceAll("(?i)</li>", "")
+                                    .replaceAll("(?i)<li>", "\n• ")
+                                    .replaceAll("<[^>]+>", "")
+                                    .trim();
+                        } else {
+                            result = "No ingredients found for " + value;
+                        }
+                    } catch (Exception e) {
+                        result = "Error using meal ingredients";
+                    }
                     break;
             }
 
-            // Second response from Gemini to chat if needed
             HttpURLConnection formatConn = (HttpURLConnection) new URL(API_URL).openConnection();
             formatConn.setRequestMethod("POST");
             formatConn.setRequestProperty("Content-Type", "application/json");
