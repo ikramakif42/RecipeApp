@@ -75,32 +75,14 @@ public class BotChat extends AsyncTask<String, Void, String> {
 //                    "Respond ONLY with a valid JSON object, NOTHING ELSE like:\n" +
 //                    "{ \"intent\": \"get_recipes\", \"value\": \"apples,flour,sugar\" }\n\n" +
 //                    "User input: \"" + userMessage + "\"";
-//            String classifierPrompt = "You are a task classifier. Classify user input into one of these intents:\n" +
-//                    "1. get_recipes - when user asks for recipe suggestions\n" +
-//                    "2. save_meal - when user wants to add ingredients to a meal category (breakfast/lunch/dinner/snacks)\n" +
-//                    "3. use_meal - when user wants recipes for a specific meal category\n" +
-//                    "4. calorie_filter - when user mentions calories\n\n" +
-//
-//                    "For save_meal intent, extract:\n" +
-//                    "- meal: one of [breakfast, lunch, dinner, snacks]\n" +
-//                    "- ingredients: comma-separated list\n\n" +
-//
-//                    "Example 1:\n" +
-//                    "User: 'add eggs and bacon to breakfast'\n" +
-//                    "Response: {\"intent\":\"save_meal\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredients\\\":\\\"eggs,bacon\\\"}\"}\n\n" +
-//
-//                    "Example 2:\n" +
-//                    "User: 'what can I make for dinner?'\n" +
-//                    "Response: {\"intent\":\"use_meal\",\"value\":\"dinner\"}\n\n" +
-//
-//                    "Current user input: \"" + userMessage + "\"";
+////
             String classifierPrompt = "Classify user input into these intents:\n" +
                     "1. get_recipes - when asking for recipes\n" +
                     "2. save_meal - when adding to meal categories (format: \"meal,item1,item2\"})\n" +
                     "3. use_meal - when requesting recipes for a category (format: \"category\")\n" +
                     "4. remove_ingredient - when removing items (format: \"meal, item\"}); ignore words like category, meal, group etc as part of the value\n" +
                     "5. calorie_filter - when asking to recalculate portions or ingredients according to a calorie limit (format: \"value\")\n\n" +
-
+                    "6. delete_favorite - when asking to remove a recipe from the favorites list." +
                     "Examples:\n" +
                     "User: 'cook using my breakfast items' =\n" +
                     "{\"intent\":\"use_meal\",\"value\":\"breakfast\"}\n\n" +

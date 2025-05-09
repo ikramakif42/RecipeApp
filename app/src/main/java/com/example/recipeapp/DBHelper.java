@@ -89,4 +89,11 @@ public class DBHelper extends SQLiteOpenHelper {
         db.close();
         return favorites;
     }
+
+    public boolean deleteFavorite(Recipe toDelete){
+        SQLiteDatabase db = this.getWritableDatabase();
+        int result = db.delete(TABLE_FAVORITES, COLUMN_FAV_NAME + "=?", new String[]{toDelete.getTitle()});
+        db.close();
+        return result > 0;
+    }
 }

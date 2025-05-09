@@ -133,7 +133,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         popup.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
 
-            if (id == R.id.menu_delete_favorites) {
+            if (id == R.id.menu_add_favorites) {
                 showRecipeSelectionDialog();
                 return true;
             } else if (id == R.id.menu_view_favorites) {
@@ -141,11 +141,49 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
                 return true;
             } else if (id == R.id.view_meals) {
                 showMealsDialog();
+            } else if (id == R.id.menu_delete_favorites) {
+                deleteFavoriteDialog();
             }
             return false;
         });
 
         popup.show();
+    }
+
+    private void deleteFavoriteDialog() {
+        // Fetch all favorites
+        List<Recipe> favorites = dbHelper.getAllFavoriteRecipes();
+
+        if (favorites.isEmpty()) {
+            Toast.makeText(this, "No favorites saved yet.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Create a list of titles for the AlertDialog
+        List<String> titles = new ArrayList<>();
+        for (Recipe recipe : favorites) {
+            titles.add(recipe.getTitle());
+        }
+
+        String[] recipeArray = titles.toArray(new String[0]);
+
+        // Display the list of recipes in a Dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Your Favorite Recipes");
+        builder.setItems(recipeArray, (dialog, which) -> {
+            // On click, get the full recipe details
+            Recipe selectedRecipe = favorites.get(which);
+
+            // Show the full details in a new dialog
+            boolean result = dbHelper.deleteFavorite(selectedRecipe);
+
+            if (result) {
+                Toast.makeText(this, "Favorite Deleted!", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Error, delete failed!", Toast.LENGTH_LONG).show();
+            }
+        });
+        builder.show();
     }
 
 
