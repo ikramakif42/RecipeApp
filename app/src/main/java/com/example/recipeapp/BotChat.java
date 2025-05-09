@@ -26,7 +26,6 @@ public class BotChat extends AsyncTask<String, Void, String> {
     public BotChat(ApiResponseListener listener) {
         this.listener = listener;
     }
-    private MealDatabase mealDb;
     private List<Meal> meals = new ArrayList<>();
 
     private String readResponse(InputStream inputStream) throws Exception {
@@ -97,18 +96,19 @@ public class BotChat extends AsyncTask<String, Void, String> {
 //                    "Current user input: \"" + userMessage + "\"";
             String classifierPrompt = "Classify user input into these intents:\n" +
                     "1. get_recipes - when asking for recipes\n" +
-                    "2. save_meal - when adding to meal categories (format: {\"meal\":\"category\",\"ingredients\":\"item1,item2\"})\n" +
+                    "2. save_meal - when adding to meal categories (format: \"meal,item1,item2\"})\n" +
                     "3. use_meal - when requesting recipes for a category (format: \"category\")\n" +
-                    "4. remove_ingredient - when removing items (format: {\"meal\":\"category\",\"ingredient\":\"item\"})\n\n" +
+                    "4. remove_ingredient - when removing items (format: \"meal, item\"}); ignore words like category, meal, group etc as part of the value\n" +
+                    "5. calorie_filter - when asking to recalculate portions or ingredients according to a calorie limit (format: \"value\")\n\n" +
 
                     "Examples:\n" +
-                    "User: 'cook using my breakfast items'\n" +
-                    "Response: {\"intent\":\"use_meal\",\"value\":\"breakfast\"}\n\n" +
+                    "User: 'cook using my breakfast items' =\n" +
+                    "{\"intent\":\"use_meal\",\"value\":\"breakfast\"}\n\n" +
 
-                    "User: 'remove eggs from breakfast'\n" +
-                    "Response: {\"intent\":\"remove_ingredient\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredient\\\":\\\"eggs\\\"}\"}\n\n" +
+                    "User: 'remove eggs from breakfast' =\n" +
+                    "{\"intent\":\"remove_ingredient\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredient\\\":\\\"eggs\\\"}\"}\n\n" +
 
-                    "User input: \"" + userMessage + "\"";
+                    "Now, User input: \"" + userMessage + "\"";
 
             JSONObject requestBody = buildRequestBody(classifierPrompt);
             Log.d("API Request", requestBody.toString(4));
@@ -217,16 +217,14 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     return readResponse(calorieConn.getInputStream());
 
                 case "save_meal":
+                    Log.d("save_meal", userMessage+"\n"+value);
                     try {
-                        JSONObject mealData = new JSONObject(value);
-                        String mealName = mealData.getString("meal").toLowerCase();
-                        String ingredientsStr = mealData.getString("ingredients");
-
                         List<String> ingredients = new ArrayList<>();
-                        for (String item : ingredientsStr.split(",")) {
+                        for (String item : value.split(",")) {
                             String clean = item.trim().toLowerCase();
                             if (!clean.isEmpty()) ingredients.add(clean);
                         }
+                        String mealName = ingredients.remove(0);
 
                         if (!ingredients.isEmpty()) {
                             Activity activity = (Activity) listener;
@@ -243,10 +241,11 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     }
                     break;
 
-                    case "use_meal":
+                case "use_meal":
+                    Log.d("use_meal", userMessage+"\n"+value);
                     try {
                         String mealName = value.toLowerCase();
-                        Meal meal = mealDb.mealDao().getMealByName(mealName);
+                        Meal meal = MainActivity.mealDb.mealDao().getMealByName(mealName);
 
                         if (meal != null && !meal.getIngredients().isEmpty()) {
                             String ingredients = String.join(", ", meal.getIngredients());
@@ -256,6 +255,21 @@ public class BotChat extends AsyncTask<String, Void, String> {
                         } else {
                             result = "Your " + mealName + " category is empty. Add ingredients first!";
                         }
+
+                        // Format into Gemini JSON
+                        JSONObject mealResponse = new JSONObject();
+                        candidates = new JSONArray();
+                        cand = new JSONObject();
+                        content = new JSONObject();
+                        parts = new JSONArray();
+
+                        parts.put(new JSONObject().put("text", result));
+                        content.put("parts", parts);
+                        cand.put("content", content);
+                        candidates.put(cand);
+                        mealResponse.put("candidates", candidates);
+
+                        return mealResponse.toString();
                     } catch (Exception e) {
                         result = "Error accessing " + value + " category";
                         Log.e("MEAL_USE", "Error using meal", e);
@@ -263,6 +277,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     break;
 
                 case "remove_ingredient":
+                    Log.d("remove_ingredient", userMessage+"\n"+value);
                     try {
                         JSONObject removalData = new JSONObject(value);
                         String mealName = removalData.getString("meal").toLowerCase();
@@ -277,7 +292,20 @@ public class BotChat extends AsyncTask<String, Void, String> {
                         result = "Failed to remove ingredient";
                         Log.e("REMOVE_INGREDIENT", "Error parsing removal request", e);
                     }
-                    break;
+                    // Format into Gemini JSON
+                    JSONObject mealResponse = new JSONObject();
+                    candidates = new JSONArray();
+                    cand = new JSONObject();
+                    content = new JSONObject();
+                    parts = new JSONArray();
+
+                    parts.put(new JSONObject().put("text", result));
+                    content.put("parts", parts);
+                    cand.put("content", content);
+                    candidates.put(cand);
+                    mealResponse.put("candidates", candidates);
+
+                    return mealResponse.toString();
                 default:
                     Log.d("default", userMessage+"\n"+value);
                     result = "Sorry, I couldn't understand your request. Please rephrase.";

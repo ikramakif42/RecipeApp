@@ -34,10 +34,10 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
     private ArrayList<ChatMessage> chatMessages;
     private EditText editTextMessage;
     public static ArrayList<JSONObject> conversationHistory = new ArrayList<>();
-    private MealDatabase mealDb;
+    public static MealDatabase mealDb;
     private List<Meal> meals = new ArrayList<>();
     public static ArrayList<Recipe> recipeList = new ArrayList<>();
-    private MealRepository mealRepository;
+    private static MealRepository mealRepository;
     private DBHelper dbHelper;
 
     @Override
@@ -83,11 +83,12 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
             } catch (Exception e) {
                 Log.e("DB_INIT", "Error initializing meals", e);
                 runOnUiThread(() ->
-                        Toast.makeText(this, "Error initializing meals", Toast.LENGTH_SHORT).show());
+                        Toast.makeText(this, "MAIN: Error initializing meals", Toast.LENGTH_SHORT).show());
             }
         }).start();
     }
 
+    //TODO: Delete later
     private void showMealsDialog() {
         Dialog dialog = new Dialog(this);
         dialog.setContentView(R.layout.dialog_layout);
@@ -138,6 +139,8 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
             } else if (id == R.id.menu_view_favorites) {
                 showFavoritesDialog();
                 return true;
+            } else if (id == R.id.view_meals) {
+                showMealsDialog();
             }
             return false;
         });
@@ -188,6 +191,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         }).start();
     }
 
+    //TODO: Delete later
     private void loadMeals() {
         new Thread(() -> {
             List<Meal> meals = mealDb.mealDao().getAllMeals();
@@ -210,18 +214,6 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         new BotChat(this).execute(message);
     }
 
-    private void showDummyDialog(String title) {
-        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_dummy_popup);
-        dialog.setCancelable(true);
-
-        TextView titleView = dialog.findViewById(R.id.dialogTitle);
-        titleView.setText(title);
-
-        dialog.findViewById(R.id.btnCloseDialog).setOnClickListener(v -> dialog.dismiss());
-
-        dialog.show();
-    }
 
     private void debugPrintAllMeals() {
         new Thread(() -> {
@@ -240,6 +232,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
     }
 
+    //TODO: Delete later
     public void handleAddIngredients(String mealName, String ingredients) {
         List<String> ingredientList = Arrays.asList(ingredients.split(","));
         mealRepository.addIngredientsToMeal(mealName, ingredientList);
