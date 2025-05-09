@@ -61,20 +61,53 @@ public class BotChat extends AsyncTask<String, Void, String> {
             userMessageObj.put("parts", parts);
             MainActivity.conversationHistory.add(userMessageObj);
 
-            String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n + " +
-                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter]\n" +
-                    "2. value: cleaned data to use based on intent.\n\n" +
-                    "Rules for meals:\n" +
-                    "- If intent is save_meal: 'value' must be a JSON string with 'meal' (breakfast/lunch/dinner/snacks) and 'ingredients' (comma-separated list)\n" +
-                    "- If intent is use_meal: 'value' must be the meal name (breakfast/lunch/dinner/snacks)\n\n" +
-                    "Example responses:\n" +
-                    "User: 'add eggs and bacon to breakfast'\n" +
-                    "Response: {\"intent\":\"save_meal\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredients\\\":\\\"eggs,bacon\\\"}\"}\n\n" +
-                    "Rules:\n" +
-                    "- If intent is get_recipes: 'value' must be a comma-separated list of ingredients, corrected for typos.\n" +
-                    "- If intent is calorie_filter: 'value' is the calorie limit as a number (e.g., 500).\n\n" +
-                    "Respond ONLY with a valid JSON object, NOTHING ELSE like:\n" +
-                    "{ \"intent\": \"get_recipes\", \"value\": \"apples,flour,sugar\" }\n\n" +
+//            String classifierPrompt = "You are a task classifier and input corrector. Based on the user input, respond with a JSON object that includes:\n + " +
+//                    "1. intent: one of [get_recipes, save_preset, save_favorite, calorie_filter]\n" +
+//                    "2. value: cleaned data to use based on intent.\n\n" +
+//                    "Rules for meals:\n" +
+//                    "- If intent is save_meal: 'value' must be a JSON string with 'meal' (breakfast/lunch/dinner/snacks) and 'ingredients' (comma-separated list)\n" +
+//                    "- If intent is use_meal: 'value' must be the meal name (breakfast/lunch/dinner/snacks)\n\n" +
+//                    "Example responses:\n" +
+//                    "User: 'add eggs and bacon to breakfast'\n" +
+//                    "Response: {\"intent\":\"save_meal\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredients\\\":\\\"eggs,bacon\\\"}\"}\n\n" +
+//                    "Rules:\n" +
+//                    "- If intent is get_recipes: 'value' must be a comma-separated list of ingredients, corrected for typos.\n" +
+//                    "- If intent is calorie_filter: 'value' is the calorie limit as a number (e.g., 500).\n\n" +
+//                    "Respond ONLY with a valid JSON object, NOTHING ELSE like:\n" +
+//                    "{ \"intent\": \"get_recipes\", \"value\": \"apples,flour,sugar\" }\n\n" +
+//                    "User input: \"" + userMessage + "\"";
+//            String classifierPrompt = "You are a task classifier. Classify user input into one of these intents:\n" +
+//                    "1. get_recipes - when user asks for recipe suggestions\n" +
+//                    "2. save_meal - when user wants to add ingredients to a meal category (breakfast/lunch/dinner/snacks)\n" +
+//                    "3. use_meal - when user wants recipes for a specific meal category\n" +
+//                    "4. calorie_filter - when user mentions calories\n\n" +
+//
+//                    "For save_meal intent, extract:\n" +
+//                    "- meal: one of [breakfast, lunch, dinner, snacks]\n" +
+//                    "- ingredients: comma-separated list\n\n" +
+//
+//                    "Example 1:\n" +
+//                    "User: 'add eggs and bacon to breakfast'\n" +
+//                    "Response: {\"intent\":\"save_meal\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredients\\\":\\\"eggs,bacon\\\"}\"}\n\n" +
+//
+//                    "Example 2:\n" +
+//                    "User: 'what can I make for dinner?'\n" +
+//                    "Response: {\"intent\":\"use_meal\",\"value\":\"dinner\"}\n\n" +
+//
+//                    "Current user input: \"" + userMessage + "\"";
+            String classifierPrompt = "Classify user input into these intents:\n" +
+                    "1. get_recipes - when asking for recipes\n" +
+                    "2. save_meal - when adding to meal categories (format: {\"meal\":\"category\",\"ingredients\":\"item1,item2\"})\n" +
+                    "3. use_meal - when requesting recipes for a category (format: \"category\")\n" +
+                    "4. remove_ingredient - when removing items (format: {\"meal\":\"category\",\"ingredient\":\"item\"})\n\n" +
+
+                    "Examples:\n" +
+                    "User: 'cook using my breakfast items'\n" +
+                    "Response: {\"intent\":\"use_meal\",\"value\":\"breakfast\"}\n\n" +
+
+                    "User: 'remove eggs from breakfast'\n" +
+                    "Response: {\"intent\":\"remove_ingredient\",\"value\":\"{\\\"meal\\\":\\\"breakfast\\\",\\\"ingredient\\\":\\\"eggs\\\"}\"}\n\n" +
+
                     "User input: \"" + userMessage + "\"";
 
             JSONObject requestBody = buildRequestBody(classifierPrompt);
@@ -191,7 +224,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
 
                         List<String> ingredients = new ArrayList<>();
                         for (String item : ingredientsStr.split(",")) {
-                            String clean = item.trim();
+                            String clean = item.trim().toLowerCase();
                             if (!clean.isEmpty()) ingredients.add(clean);
                         }
 
@@ -200,7 +233,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                             if (activity instanceof MainActivity) {
                                 ((MainActivity)activity).addIngredientsToMeal(mealName, ingredients);
                             }
-                            result = "Added to " + mealName;
+                            result = "✓ Added to " + mealName + ": " + String.join(", ", ingredients);
                         } else {
                             result = "No valid ingredients provided";
                         }
@@ -209,23 +242,42 @@ public class BotChat extends AsyncTask<String, Void, String> {
                         Log.e("MEAL_PARSE", "Failed to parse: " + value, e);
                     }
                     break;
+
+
+                // In the switch(intent) block:
                 case "use_meal":
-                    Log.d("use_meal", userMessage+"\n"+value);
                     try {
-                        Meal meal = mealDb.mealDao().getMealByName(value);
+                        String mealName = value.toLowerCase();
+                        Meal meal = mealDb.mealDao().getMealByName(mealName);
+
                         if (meal != null && !meal.getIngredients().isEmpty()) {
                             String ingredients = String.join(", ", meal.getIngredients());
                             result = SpoonHelper.getRecipesByIngredients(ingredients)
-                                    .replaceAll("(?i)<ol>|</ol>", "")
-                                    .replaceAll("(?i)</li>", "")
-                                    .replaceAll("(?i)<li>", "\n• ")
-                                    .replaceAll("<[^>]+>", "")
+                                    .replaceAll("(?i)<[^>]+>", "") // Clean HTML tags
                                     .trim();
                         } else {
-                            result = "No ingredients found for " + value;
+                            result = "Your " + mealName + " category is empty. Add ingredients first!";
                         }
                     } catch (Exception e) {
-                        result = "Error using meal ingredients";
+                        result = "Error accessing " + value + " category";
+                        Log.e("MEAL_USE", "Error using meal", e);
+                    }
+                    break;
+
+                case "remove_ingredient":
+                    try {
+                        JSONObject removalData = new JSONObject(value);
+                        String mealName = removalData.getString("meal").toLowerCase();
+                        String ingredientToRemove = removalData.getString("ingredient").toLowerCase().trim();
+
+                        Activity activity = (Activity) listener;
+                        if (activity instanceof MainActivity) {
+                            ((MainActivity)activity).removeIngredientFromMeal(mealName, ingredientToRemove);
+                            result = "✓ Removed " + ingredientToRemove + " from " + mealName;
+                        }
+                    } catch (Exception e) {
+                        result = "Failed to remove ingredient";
+                        Log.e("REMOVE_INGREDIENT", "Error parsing removal request", e);
                     }
                     break;
                 default:

@@ -18,6 +18,7 @@ public class SpoonHelper {
     private static final String SPOONACULAR_API_KEY = BuildConfig.SPOON_API_KEY;
 
     public static String getRecipesByIngredients(String userIngredients) {
+
         HttpURLConnection connection = null;
         StringBuilder output = new StringBuilder();
 
@@ -60,6 +61,8 @@ public class SpoonHelper {
         } finally {
             if (connection != null) connection.disconnect();
         }
+
+
     }
 
     private static String fetchFullRecipeById(int id) throws Exception {

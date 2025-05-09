@@ -2,6 +2,8 @@ package com.example.recipeapp;
 
 import android.app.Dialog;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -9,8 +11,7 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.example.recipeapp.Meal;
-import com.example.recipeapp.MealDatabase;
+import java.util.Arrays;
 import java.util.List;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -19,7 +20,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements ApiResponseListener {
     private ChatAdapter chatAdapter;
@@ -29,6 +29,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
     private MealDatabase mealDb;
     private List<Meal> meals = new ArrayList<>();
     public static ArrayList<Recipe> recipeList = new ArrayList<>();
+    private MealRepository mealRepository;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,27 +47,30 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         findViewById(R.id.btnSend).setOnClickListener(this::sendMessage);
         findViewById(R.id.btnOptions).setOnClickListener(this::viewOptions);
 
-        mealDb = MealDatabase.getInstance(this);
+        mealDb = MealDatabase.getDatabase(getApplicationContext());
+        mealRepository = new MealRepository(getApplication());
         loadInitialMeals();
     }
     private void loadInitialMeals() {
         new Thread(() -> {
-            List<Meal> storedMeals = mealDb.mealDao().getAllMeals();
-            if (storedMeals.isEmpty()) {
-                // Create default meals if none exist
-                Meal breakfast = new Meal("Breakfast");
-                Meal lunch = new Meal("Lunch");
-                Meal dinner = new Meal("Dinner");
-                Meal snacks = new Meal("Snacks");
+            try {
+                if (mealDb == null) {
+                    mealDb = MealDatabase.getDatabase(getApplicationContext());
+                }
 
-                mealDb.mealDao().insert(breakfast);
-                mealDb.mealDao().insert(lunch);
-                mealDb.mealDao().insert(dinner);
-                mealDb.mealDao().insert(snacks);
-
-                storedMeals = mealDb.mealDao().getAllMeals();
+                if (mealDb.mealDao().getAllMeals().isEmpty()) {
+                    mealDb.mealDao().insertAll(
+                            new Meal("breakfast"),
+                            new Meal("lunch"),
+                            new Meal("dinner"),
+                            new Meal("snacks")
+                    );
+                }
+            } catch (Exception e) {
+                Log.e("DB_INIT", "Error initializing meals", e);
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Error initializing meals", Toast.LENGTH_SHORT).show());
             }
-            meals = storedMeals;
         }).start();
     }
 
@@ -76,8 +80,23 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
 
         RecyclerView mealsRecyclerView = dialog.findViewById(R.id.mealsRecyclerView);
         mealsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        mealsRecyclerView.setAdapter(new MealAdapter(meals));
-
+        new Thread(() -> {
+            final List<Meal>[] meals = new List[]{mealDb.mealDao().getAllMeals()};
+            runOnUiThread(() -> {
+                if (meals[0].isEmpty()) {
+                    // Add default meals if empty
+                    mealDb.mealDao().insertAll(
+                            new Meal("breakfast"),
+                            new Meal("lunch"),
+                            new Meal("dinner"),
+                            new Meal("snacks")
+                    );
+                    meals[0] = mealDb.mealDao().getAllMeals(); // Reload
+                }
+                MealAdapter adapter = new MealAdapter(meals[0]);
+                mealsRecyclerView.setAdapter(adapter);
+            });
+        }).start();
         dialog.findViewById(R.id.btnCloseMeals).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
@@ -121,8 +140,12 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
                 Meal meal = mealDb.mealDao().getMealByName(mealName);
                 if (meal == null) {
                     meal = new Meal(mealName);
-                    mealDb.mealDao().insert(meal);
-                    meal = mealDb.mealDao().getMealByName(mealName);
+                    mealDb.mealDao().insertAll(
+                            new Meal("breakfast"),
+                            new Meal("lunch"),
+                            new Meal("dinner"),
+                            new Meal("snacks")
+                    );                    meal = mealDb.mealDao().getMealByName(mealName);
                 }
 
                 List<String> currentIngredients = new ArrayList<>(meal.getIngredients());
@@ -200,5 +223,46 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
     public void onApiResponse(String response) {
         chatMessages.add(new ChatMessage(response, false));
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+    }
+    public void handleAddIngredients(String mealName, String ingredients) {
+        List<String> ingredientList = Arrays.asList(ingredients.split(","));
+        mealRepository.addIngredientsToMeal(mealName, ingredientList);
+
+        // Debug verification
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            new Thread(() -> {
+                Meal meal = MealDatabase.getDatabase(this)
+                        .mealDao()
+                        .getMealByName(mealName.toLowerCase());
+                runOnUiThread(() -> {
+                    if (meal != null) {
+                        Log.d("MEAL_DEBUG", "Current ingredients: " + meal.getIngredients());
+                        Toast.makeText(this,
+                                "Updated " + mealName + ": " + meal.getIngredients(),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+            }).start();
+        }, 1000);
+    }
+    public void removeIngredientFromMeal(String mealName, String ingredient) {
+        new Thread(() -> {
+            try {
+                Meal meal = mealDb.mealDao().getMealByName(mealName);
+                if (meal != null) {
+                    List<String> ingredients = new ArrayList<>(meal.getIngredients());
+                    ingredients.remove(ingredient.toLowerCase());
+                    meal.setIngredients(ingredients);
+                    mealDb.mealDao().update(meal);
+
+                    runOnUiThread(() ->
+                            Toast.makeText(this, "Removed from " + mealName, Toast.LENGTH_SHORT).show());
+                }
+            } catch (Exception e) {
+                Log.e("REMOVE_ERROR", "Failed to remove ingredient", e);
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Removal failed", Toast.LENGTH_SHORT).show());
+            }
+        }).start();
     }
 }
