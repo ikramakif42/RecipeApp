@@ -20,6 +20,14 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog; // <-- This is the missing one
+import android.os.Bundle;
+import android.view.View;
+import android.widget.PopupMenu;
+import android.widget.Toast;
+import java.util.List;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements ApiResponseListener {
     private ChatAdapter chatAdapter;
@@ -30,11 +38,16 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
     private List<Meal> meals = new ArrayList<>();
     public static ArrayList<Recipe> recipeList = new ArrayList<>();
     private MealRepository mealRepository;
+    private DBHelper dbHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        dbHelper = new DBHelper(this);
+
 
         chatMessages = new ArrayList<>();
         chatAdapter = new ChatAdapter(chatMessages);
@@ -51,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         mealRepository = new MealRepository(getApplication());
         loadInitialMeals();
     }
+
     private void loadInitialMeals() {
         new Thread(() -> {
             try {
@@ -100,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         dialog.findViewById(R.id.btnCloseMeals).setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
+
     private void viewOptions(View v) {
         //TODO: Add Favorites, View Favorites, Delete Favorites, Add Frequents, View Frequents, Delete Frequents
         // Add Favorites: Load recipes from recipeList, on click selected recipe saved to DB
@@ -115,18 +130,13 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         popup.getMenuInflater().inflate(R.menu.options_menu, popup.getMenu());
 
         popup.setOnMenuItemClickListener(item -> {
-            String selected = (String) item.getTitle();
+            int id = item.getItemId();
 
-            if (selected.equals("Load Preset") ||
-                    selected.equals("Remove Presets") ||
-                    selected.equals("View Favorites") ||
-                    selected.equals("Delete Favorites")) {
-
-                showDummyDialog(selected);
+            if (id == R.id.menu_delete_favorites) {
+                showRecipeSelectionDialog();
                 return true;
-            }
-            if (selected.equals("Meals")) {
-                showMealsDialog();
+            } else if (id == R.id.menu_view_favorites) {
+                showFavoritesDialog();
                 return true;
             }
             return false;
@@ -134,6 +144,8 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
 
         popup.show();
     }
+
+
     public void addIngredientsToMeal(String mealName, List<String> newIngredients) {
         new Thread(() -> {
             try {
@@ -145,7 +157,8 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
                             new Meal("lunch"),
                             new Meal("dinner"),
                             new Meal("snacks")
-                    );                    meal = mealDb.mealDao().getMealByName(mealName);
+                    );
+                    meal = mealDb.mealDao().getMealByName(mealName);
                 }
 
                 List<String> currentIngredients = new ArrayList<>(meal.getIngredients());
@@ -182,6 +195,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
             });
         }).start();
     }
+
     private void sendMessage(View v) {
         if (findViewById(R.id.introMessage).getVisibility() == View.VISIBLE) {
             findViewById(R.id.introMessage).setVisibility(View.GONE);
@@ -208,6 +222,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
 
         dialog.show();
     }
+
     private void debugPrintAllMeals() {
         new Thread(() -> {
             List<Meal> allMeals = mealDb.mealDao().getAllMeals();
@@ -224,6 +239,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
         chatMessages.add(new ChatMessage(response, false));
         chatAdapter.notifyItemInserted(chatMessages.size() - 1);
     }
+
     public void handleAddIngredients(String mealName, String ingredients) {
         List<String> ingredientList = Arrays.asList(ingredients.split(","));
         mealRepository.addIngredientsToMeal(mealName, ingredientList);
@@ -245,6 +261,7 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
             }).start();
         }, 1000);
     }
+
     public void removeIngredientFromMeal(String mealName, String ingredient) {
         new Thread(() -> {
             try {
@@ -265,4 +282,97 @@ public class MainActivity extends AppCompatActivity implements ApiResponseListen
             }
         }).start();
     }
+
+    private void showRecipeSelectionDialog() {
+        // Pull the current recipes displayed in the chat
+        List<String> searchResults = new ArrayList<>();
+        for (Recipe recipe : recipeList) {
+            searchResults.add(recipe.getTitle());
+        }
+
+        if (searchResults.isEmpty()) {
+            Toast.makeText(this, "No recipes found. Search first!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Convert the list to an array to display in the dialog
+        String[] recipeArray = searchResults.toArray(new String[0]);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Select a Recipe to Add to Favorites");
+        builder.setItems(recipeArray, (dialog, which) -> {
+            // When an item is clicked, get the title from the list
+            String selectedRecipe = recipeArray[which];
+
+            // Find the recipe object that matches the title
+            Recipe matchingRecipe = null;
+            for (Recipe recipe : recipeList) {
+                if (recipe.getTitle().equals(selectedRecipe)) {
+                    matchingRecipe = recipe;
+                    break;
+                }
+            }
+
+            if (matchingRecipe != null) {
+                // Save the complete recipe to the database
+                dbHelper.addToFavorites(matchingRecipe.getTitle(),
+                        "Ingredients:\n" + matchingRecipe.getIngredients() +
+                                "\n\nInstructions:\n" + matchingRecipe.getInstructions());
+                Toast.makeText(this, matchingRecipe.getTitle() + " added to favorites!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Recipe not found.", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.show();
+    }
+
+
+
+    private void showFavoritesDialog() {
+        // Fetch all favorites
+        List<Recipe> favorites = dbHelper.getAllFavoriteRecipes();
+
+        if (favorites.isEmpty()) {
+            Toast.makeText(this, "No favorites saved yet.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Create a list of titles for the AlertDialog
+        List<String> titles = new ArrayList<>();
+        for (Recipe recipe : favorites) {
+            titles.add(recipe.getTitle());
+        }
+
+        String[] recipeArray = titles.toArray(new String[0]);
+
+        // Display the list of recipes in a Dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Your Favorite Recipes");
+        builder.setItems(recipeArray, (dialog, which) -> {
+            // On click, get the full recipe details
+            Recipe selectedRecipe = favorites.get(which);
+
+            // Show the full details in a new dialog
+            showRecipeDetailsDialog(selectedRecipe);
+        });
+        builder.show();
+    }
+
+    private void showRecipeDetailsDialog(Recipe recipe) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(recipe.getTitle());
+
+        // Format the details
+        String details = "Ingredients:\n" + recipe.getIngredients() + "\n\n" +
+                "Instructions:\n" + recipe.getInstructions();
+
+        builder.setMessage(details);
+        builder.setPositiveButton("Close", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+
+
+
+
 }

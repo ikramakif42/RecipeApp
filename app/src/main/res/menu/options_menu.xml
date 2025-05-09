@@ -3,6 +3,6 @@
     <item android:id="@+id/menu_load_preset" android:title="Load Preset" />
     <item android:id="@+id/menu_remove_preset" android:title="Remove Presets" />
     <item android:id="@+id/menu_view_favorites" android:title="View Favorites" />
-    <item android:id="@+id/menu_delete_favorites" android:title="Delete Favorites" />
+    <item android:id="@+id/menu_delete_favorites" android:title="Add to Favorites" />
     <item android:id="@+id/view_meals" android:title="Meals" />
 </menu>
