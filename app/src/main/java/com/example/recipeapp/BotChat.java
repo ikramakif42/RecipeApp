@@ -243,9 +243,7 @@ public class BotChat extends AsyncTask<String, Void, String> {
                     }
                     break;
 
-
-                // In the switch(intent) block:
-                case "use_meal":
+                    case "use_meal":
                     try {
                         String mealName = value.toLowerCase();
                         Meal meal = mealDb.mealDao().getMealByName(mealName);

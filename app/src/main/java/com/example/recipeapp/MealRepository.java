@@ -2,9 +2,6 @@ package com.example.recipeapp;
 
 import android.app.Application;
 import android.util.Log;
-
-import androidx.lifecycle.LiveData;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;

@@ -80,7 +80,6 @@ public class SpoonHelper {
         JSONObject data = new JSONObject(jsonResponse);
 
         String title = data.optString("title", "Untitled");
-        // Remove the summary section completely
         String instructions = data.optString("instructions", "No instructions provided.");
 
         // Get calories if nutrition info is available
